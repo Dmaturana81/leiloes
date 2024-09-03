@@ -1,4 +1,3 @@
-from pyexpat import model
 from pydantic import BaseModel, Field, model_validator, field_validator
 
 from mortgage import Mortgage_price
@@ -8,10 +7,11 @@ class Imovel(BaseModel):
     """Class to represent a Imovel"""
 
     valor_venda: float = Field(default=200000, alias="Valor Venta", ge=0)  # Fixo,
-
     valor_iptu: float = Field(default=50.0, alias="IPTU", ge=0)
     valor_condominio: float = Field(default=300.0, alias="Condominio", ge=0)
-    valor_corretor: float = Field(default=5, alias="Comision", ge=0)  # Percentage
+    valor_corretor: float = Field(
+        default=6, alias="Comision corretor", ge=0
+    )  # Percentage
     valor_aluguel: float = Field(default=0.0, alias="Valor Aluguel")
 
     @field_validator("valor_corretor")
@@ -20,12 +20,7 @@ class Imovel(BaseModel):
 
     def custos_mensais(self, parcela: float = 0):
         """Calcular custos mensais = IPTU + Condominio. Caso de ter Aluguel = Aluguel - (IPTU + Condominio)"""
-        return (
-            self.valor_iptu + self.valor_condominio + parcela - self.valor_aluguel
-            # if self.valor_aluguel is None
-            # else self.valor_aluguel
-            # - (self.valor_iptu + self.valor_condominio + parcela)
-        )
+        return self.valor_iptu + self.valor_condominio + parcela - self.valor_aluguel
 
     def calculo_receita_liq(self, saldo_devedor: float | None):
         """Calcular receita liquida = Valor Venta * (1 - Comision) - saldo devedor"""
@@ -39,36 +34,23 @@ class Leilao(BaseModel):
     url: str = ""
     valor_inicial: float = Field(default=100000, alias="Valor Inicial", ge=0)
     lance_minimo: float = Field(default=5000, alias="Lance minimo", ge=0)
-    valor_arremate: float
-    n_lance: int = Field(default=1, alias="Lance", ge=0)
-    # financiamento: int = Field(default=95, alias="Financiado")
-    # pc_financiado: float
+    n_lance: int = Field(default=0, alias="Lance", ge=0)
 
     @model_validator(mode="before")
     @classmethod
     def validate_valor_arremate(cls, values):
-        values["valor_arremate"] = values["Valor Inicial"] + (
+        values["Valor Arremate"] = values["Valor Inicial"] + (
             values["Lance minimo"] * values["Lance"]
         )
-        # values["pc_financiado"] = values["Financiado"] / 100
         return values
-
-    def actualizar_valor(self, n_lances: int):
-        """Actualizar valor lance arremate"""
-        self.valor_arremate = self.valor_inicial + n_lances * self.lance_minimo
 
     def actualizar_lance(self):
         """Actualizar numero de lances"""
         self.n_lance += 1
 
-    def calculo_total_arremate(self):
-        """Calcular total = valor_arremate * n_lance"""
-        self.valor_arremate = (
-            self.valor_inicial + (self.lance_minimo * self.n_lance)
-            # if not self.financiamento
-            # else (self.valor_inicial + (self.lance_minimo * self.n_lance))
-        )
-        return self.valor_arremate
+    @property
+    def valor_arremate(self):
+        return self.valor_inicial + (self.lance_minimo * self.n_lance)
 
 
 class Pos_imissao(BaseModel):
@@ -87,9 +69,9 @@ class Custo_arrematacao(BaseModel):
     """Class to represent a Custo_arrematacao"""
 
     valor_leiloero: float = Field(default=5.0, alias="Leiloero", ge=0)
-    valor_ITBI: float = Field(default=5.0, alias="ITBI", ge=0)
-    valor_registro: float = Field(default=0.01, alias="Registro", ge=0)
-    valor_abogado: float = Field(default=4.0, alias="Abogado", ge=0)
+    valor_ITBI: float = Field(default=2.0, alias="ITBI", ge=0)
+    valor_registro: float = Field(default=1.0, alias="Registro", ge=0)
+    valor_abogado: float = Field(default=5.0, alias="Abogado", ge=0)
     pc_comissao_leiloero: float
     pc_itbi: float
     pc_registro: float
@@ -116,12 +98,17 @@ class Custo_arrematacao(BaseModel):
         """Calcular registro = valor_arremate * pc_registro"""
         return self.pc_registro * valor_arremate
 
+    def valor_total_abogado(self, valor_arremate: float):
+        """Calcular abogado = valor_arremate * pc_abogado"""
+        return self.pc_abogado * valor_arremate
+
     def calculo_custo_arramatacao(self, valor_arremate: float):
         """Calcular custo arrematacao = comissao leiloero + ITBI + Registro"""
         return (
             self.valor_comissao_leiloero(valor_arremate)
             + self.valor_itbi(valor_arremate)
             + self.valor_total_registro(valor_arremate)
+            + self.valor_total_abogado(valor_arremate)
         )
 
 
@@ -193,7 +180,11 @@ class CashFlow(BaseModel, arbitrary_types_allowed=True, extra="allow"):
             if "financiamento" in values
             else 0
         )
-        values["entrada"] = values["leilao"]["Valor Arremate"] * values["pc_entrada"]
+        values["entrada"] = (
+            values["leilao"]["Valor Arremate"] * values["pc_entrada"]
+            if "financiamento" in values
+            else 0
+        )
         return values
 
     def calculo_receta_liquida(self):
@@ -277,12 +268,10 @@ class CashFlow(BaseModel, arbitrary_types_allowed=True, extra="allow"):
     ):
         """Calcular despesas. Total = Valor pago + Impostos + Posposse"""
         return (
-            (
-                self.leilao.valor_arremate
-                + self.calculo_custo_arrematacao()
-                + self.calculo_posimissao()
-                + self.calculo_despensas_posposse()
-            )
+            self.leilao.valor_arremate
+            + self.calculo_custo_arrematacao()
+            + self.calculo_posimissao()
+            + self.calculo_despensas_posposse()
             if not self.financiamento
             else (
                 self.entrada
@@ -311,6 +300,6 @@ class CashFlow(BaseModel, arbitrary_types_allowed=True, extra="allow"):
             "Lucro Bruto": self.calculo_lucro_bruto(),
             "Lucro Liquido": self.calculo_lucro_liquido(),
             "ROI": self.calculo_roi(),
-            "Total Arremate": self.leilao.calculo_total_arremate(),
+            "Total Arremate": self.leilao.valor_arremate,
             "Ganho Capital": self.calculo_ganho_capital(),
         }

@@ -22,16 +22,18 @@ def calculate(**kwargs):
     a.header("A vista")
     data = cashflow.do_all()
     for k, v in data.items():
-        a.write(f"{k}: {round(v,2)}")
-    # a.write(cashflow.calculo_total_despesas())
-    # a.write(cashflow.calculo_receta_liquida())
-    # a.write(cashflow.calculo_lucro_bruto())
-    # a.write(cashflow.calculo_lucro_liquido())
-    # a.write(cashflow.calculo_roi())
-    # a.write(cashflow.leilao.calculo_total_arremate())
-    # a.write(cashflow.calculo_ganho_capital())
+        if isinstance(v, float):
+            a.write(f"{k}: ${v:,.2f}".format(k=k, v=round(v, 2))) if k.lower() not in [
+                "roi"
+            ] else a.write(f"{k}: {v:,.2f}%".format(k=k, v=round(v, 2)))
+    # a.write(f"Total Despesas: {cashflow.calculo_total_despesas()}")
+    # a.write(f"Receita Liquida: {cashflow.calculo_receta_liquida()}")
+    # a.write(f"Lucro Bruto: {cashflow.calculo_lucro_bruto()}")
+    # a.write(f"Lucro Liquido: {cashflow.calculo_lucro_liquido()}")
+    # a.write(f"ROI: {cashflow.calculo_roi()}")
+    # a.write(f"Ganho Capital: {cashflow.calculo_ganho_capital()}")
     # a.write(
-    #     cashflow.arrematacao.valor_comissao_leiloero(cashflow.leilao.valor_arremate)
+    #     f"Comissão Leiloeiro: {cashflow.arrematacao.valor_comissao_leiloero(cashflow.leilao.valor_arremate)}"
     # )
     # a.write(cashflow.arrematacao.valor_itbi(cashflow.leilao.valor_arremate))
     # a.write(cashflow.arrematacao.valor_total_registro(cashflow.leilao.valor_arremate))
@@ -39,8 +41,10 @@ def calculate(**kwargs):
     b.header("Com financiamento")
     data_f = cashflow_f.do_all()
     for k, v in data_f.items():
-        b.write(f"{k}: {round(v,2)}")
-    # b.write(cashflow_f.calculo_total_despesas())
+        b.write(f"{k}: ${v:,.2f}".format(k=k, v=round(v, 2))) if k.lower() not in [
+            "roi"
+        ] else b.write(f"{k}: {v:,.2f}%".format(k=k, v=round(v, 2)))  # ${:,.2f}
+        # b.write(cashflow_f.calculo_total_despesas())
     # b.write(cashflow_f.calculo_receta_liquida())
     # b.write(cashflow_f.calculo_lucro_bruto())
     # b.write(cashflow_f.calculo_lucro_liquido())
@@ -66,10 +70,6 @@ if __name__ == "__main__":
     leilao_dict = {}
     imovel_dict = {}
     # write the form fields for the class Imovel
-    imovel_dict["Valor Venta"] = expander.number_input(
-        "Valor Venta", key="valor_venta", value=200000
-    )
-
     for k, v in Leilao.schema()["properties"].items():
         if k in ["id_", "url"]:
             continue
