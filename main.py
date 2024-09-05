@@ -22,7 +22,7 @@ def calculate(**kwargs):
     a.header("A vista")
     data = cashflow.do_all()
     for k, v in data.items():
-        if isinstance(v, float):
+        if k and isinstance(v, float):
             a.write(f"{k}: ${v:,.2f}".format(k=k, v=round(v, 2))) if k.lower() not in [
                 "roi"
             ] else a.write(f"{k}: {v:,.2f}%".format(k=k, v=round(v, 2)))
